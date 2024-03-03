@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback } from 'react';
+import { useRef, useState, useCallback, useEffect } from 'react';
 import {
   useDebounce,
   useOnWindowResize,
@@ -45,6 +45,15 @@ export function useClampText({
 
   const nodeRef = useRef<HTMLElement | null>();
   const lineHeightRef = useRef(0);
+
+  const updateLineHeight = () => {
+    if (nodeRef.current) {
+      const lineHeight = window
+        .getComputedStyle(nodeRef.current)
+        ?.getPropertyValue('line-height');
+      lineHeightRef.current = parseFloat(lineHeight.replace('px', ''));
+    }
+  };
 
   const clampLines = useCallback(
     ({
@@ -126,7 +135,10 @@ export function useClampText({
     []
   );
   const debouncedClampLines = useDebounce(clampLines, debounceTime);
-  useOnWindowResize(() =>
+  useOnWindowResize(() => {
+    updateLineHeight();
+    if (!lineHeightRef.current) return;
+    if (!text) return;
     debouncedClampLines({
       lineHeight: lineHeightRef.current,
       originalText: text,
@@ -134,15 +146,14 @@ export function useClampText({
       ellipsis,
       lines,
       charWidth,
-    })
-  );
+    });
+  });
 
   useDidMount(() => {
     if (text && !lineHeightRef.current) {
-      const lineHeight = (nodeRef.current?.clientHeight ?? 1) + 1;
-      lineHeightRef.current = lineHeight;
+      updateLineHeight();
       clampLines({
-        lineHeight,
+        lineHeight: lineHeightRef.current,
         originalText: text,
         expanded,
         ellipsis,
@@ -151,7 +162,9 @@ export function useClampText({
       });
     }
   });
+
   useDidUpdate(() => {
+    updateLineHeight();
     clampLines({
       lineHeight: lineHeightRef.current,
       originalText: text,
